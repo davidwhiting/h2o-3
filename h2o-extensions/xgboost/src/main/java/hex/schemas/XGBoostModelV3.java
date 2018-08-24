@@ -18,6 +18,14 @@ public class XGBoostModelV3 extends ModelSchemaV3<
   public static final class XGBoostModelOutputV3 extends ModelOutputSchemaV3<XGBoostOutput, XGBoostModelOutputV3> {
     @API(help="Variable Importances", direction=API.Direction.OUTPUT, level = API.Level.secondary)
     TwoDimTableV3 variable_importances;
+
+    @API(help="Sparse", direction=API.Direction.OUTPUT, level = API.Level.secondary)
+    boolean sparse;
+
+    @Override
+    public XGBoostModelOutputV3 fillFromImpl(XGBoostOutput impl) {
+      return super.fillFromImpl(impl);
+    }
   }
 
   public XGBoostV3.XGBoostParametersV3 createParametersSchema() { return new XGBoostV3.XGBoostParametersV3(); }

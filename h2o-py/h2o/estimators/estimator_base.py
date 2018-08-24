@@ -409,3 +409,56 @@ class H2OEstimator(ModelBase):
         else:
             raise NotImplementedError(model_type)
         return [metrics_class, model_class]
+
+    def convert_H2OXGBoostParams_2_XGBoostParams(self, num_class):
+        '''
+        Given a H2OXGBoost model, this method will generate the corresponding parameters that should be used
+        by native XGBoost in order to give exactly the same result assuming that the same dataset (dervied from
+        h2oFrame) is used to train the native XGBoost model.
+
+        Follow the following steps to compare H2OXGBoost and native XGBoost:
+
+        1. Train the H2OXGBoost model with H2OFrame trainFile and generate a prediction
+        h2oModelD = H2OXGBoostEstimator(**h2oParamsD) # parameters specified as a dict()
+        h2oModelD.train(x=myX, y=y, training_frame=trainFile) # train with H2OFrame trainFile
+        h2oPredict = h2oPredictD = h2oModelD.predict(trainFile)
+
+        2. derive the DMatrix from H2OFrame
+        nativeDMatrix = h2oModelD.convert_H2OXGBoostParams_2_XGBoostParams()
+
+        3. derive the parameters for native XGBoost:
+        nativeParams = trainFile.convert_H2OFrame_2_DMatrix(myX, y, h2oModelD)
+
+        4. train your native XGBoost model and generate a prediction
+        nativeModel = xgb.train(params=nativeParams[0], dtrain=nativeDMatrix, num_boost_round=nativeParams[1])
+        nativePredict = nativeModel.predict(data=nativeDMatrix, ntree_limit=nativeParams[1].
+
+        5. Compare the predictions h2oPredict, nativePredict
+
+        :param num_class: an integer representing number of classes for classification and -1 for regression
+        :return: nativeParams, num_boost_round
+        '''
+        import xgboost as xgb
+        paramsSet = self.full_parameters
+        xgboostparams = {'booster', 'silent', 'nthread', 'max_depth','gamma',
+                         'max_delta_step','subsample','colsample_bylevel','lambda','alpha',
+                         'tree_method','grow_policy','objective','seed', 'silent'}
+
+        finalParams = set(list(paramsSet.keys())).intersection(xgboostparams)
+        nativeXGBoostParams = dict()
+        for key in finalParams:
+            nativeXGBoostParams[key] = paramsSet[key]['actual_value']
+        nativeXGBoostParams['colsample_bytree']=paramsSet['col_sample_rate_per_tree']['actual_value']
+        nativeXGBoostParams['min_child_weight']=paramsSet["min_rows"]['actual_value']
+        nativeXGBoostParams['eta']=paramsSet['learn_rate']['actual_value']
+        nativeXGBoostParams['alpha']=paramsSet['reg_alpha']['actual_value']
+        nativeXGBoostParams['lambda']=paramsSet['reg_lambda']['actual_value']
+        if num_class >= 2:
+            nativeXGBoostParams['num_class']=num_class
+        if num_class > 2:
+            nativeXGBoostParams['objective'] = 'multi:softprob'
+        elif num_class == 2:
+            nativeXGBoostParams['objective'] = 'binary:logistic'
+        else:   # regression
+            nativeXGBoostParams['objective'] = 'reg:linear'
+        return nativeXGBoostParams, paramsSet['ntrees']['actual_value']
